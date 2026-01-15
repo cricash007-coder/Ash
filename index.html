@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Dictionary</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { 
+            theme: { 
+                extend: { 
+                    colors: { 
+                        darkbg: 'var(--bg-primary)', 
+                        cardbg: 'var(--bg-card)', 
+                        accent: 'var(--accent-color)', 
+                        bordercol: 'var(--border-color)',
+                        textmain: 'var(--text-primary)',
+                        textsec: 'var(--text-secondary)'
+                    } 
+                } 
+            } 
+        }
+    </script>
+</head>
+<body class="bg-darkbg text-textmain min-h-screen transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="env,react">
+        const { useState, useEffect, useRef } = React;
+        const languages = [
+            {code:'en',name:'English'}, {code:'hi',name:'Hindi'}, {code:'mr',name:'Marathi'}, {code:'bn',name:'Bengali'}, {code:'gu',name:'Gujarati'},
+            {code:'ur',name:'Urdu'}, {code:'te',name:'Telugu'}, {code:'ta',name:'Tamil'}, {code:'kn',name:'Kannada'}, {code:'ml',name:'Malayalam'},
+            {code:'pa',name:'Punjabi'}, {code:'es',name:'Spanish'}, {code:'fr',name:'French'}, {code:'de',name:'German'}, {code:'it',name:'Italian'},
+            {code:'pt',name:'Portuguese'}, {code:'ru',name:'Russian'}, {code:'ja',name:'Japanese'}, {code:'zh-CN',name:'Chinese'}, {code:'ar',name:'Arabic'},
+            {code:'tr',name:'Turkish'}, {code:'th',name:'Thai'}, {code:'ko',name:'Korean'}, {code:'nl',name:'Dutch'}, {code:'id',name:'Indonesian'}
+        ];
+
+        const InlineSpeaker = ({ text, lang }) => {
+            const play = (e) => { e.stopPropagation(); new Audio(`/api/pronounce?text=${encodeURIComponent(text)}&lang=${lang}`).play().catch(console.error); };
+            return <button onClick={play} className="inline-audio-btn" title="Listen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>;
+        };
+
+        // --- CONCEPT MAP COMPONENT ---
+        const ConceptMap = ({ centerWord, conceptMap, lang }) => {
+            if (!conceptMap || (conceptMap.synonyms.length === 0 && conceptMap.antonyms.length === 0)) return null;
+            
+            const width = 400;
+            const height = 400;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = 120;
+            
+            const synonyms = conceptMap.synonyms || [];
+            const antonyms = conceptMap.antonyms || [];
+
+            return (
+                <div className="bg-cardbg p-6 rounded-2xl shadow-xl border border-bordercol mt-6 flex flex-col items-center">
+                    <h3 className="text-xl font-bold mb-4 text-textmain w-full border-b border-bordercol pb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                        Concept Map
+                    </h3>
+                    <div className="relative graph-container">
+                        <svg width={width} height={height} className="animate-fade-in">
+                            {/* Lines for Synonyms (Green) */}
+                            {synonyms.map((syn, i) => {
+                                const angle = (i / (synonyms.length || 1)) * Math.PI - (Math.PI / 2); // Right side
+                                const x = centerX + radius * Math.cos(angle);
+                                const y = centerY + radius * Math.sin(angle);
+                                return <line key={`sline-${i}`} x1={centerX} y1={centerY} x2={x} y2={y} stroke="#22c55e" strokeWidth="1.5" opacity="0.4" />;
+                            })}
+                            {/* Lines for Antonyms (Red) */}
+                            {antonyms.map((ant, i) => {
+                                const angle = (i / (antonyms.length || 1)) * Math.PI + (Math.PI / 2); // Left side
+                                const x = centerX + radius * Math.cos(angle);
+                                const y = centerY + radius * Math.sin(angle);
+                                return <line key={`aline-${i}`} x1={centerX} y1={centerY} x2={x} y2={y} stroke="#ef4444" strokeWidth="1.5" opacity="0.4" />;
+                            })}
+                            
+                            {/* Nodes for Synonyms */}
+                            {synonyms.map((syn, i) => {
+                                const angle = (i / (synonyms.length || 1)) * Math.PI - (Math.PI / 2);
+                                const x = centerX + radius * Math.cos(angle);
+                                const y = centerY + radius * Math.sin(angle);
+                                return (
+                                    <g key={`snode-${i}`} transform={`translate(${x}, ${y})`}>
+                                        <circle r="28" fill="var(--bg-card)" stroke="#22c55e" strokeWidth="2" />
+                                        <foreignObject x="-28" y="-28" width="56" height="56">
+                                            <div className="flex items-center justify-center w-full h-full text-[10px] text-center leading-tight font-medium text-textmain p-1 break-words">{syn}</div>
+                                        </foreignObject>
+                                    </g>
+                                );
+                            })}
+                             {/* Nodes for Antonyms */}
+                             {antonyms.map((ant, i) => {
+                                const angle = (i / (antonyms.length || 1)) * Math.PI + (Math.PI / 2);
+                                const x = centerX + radius * Math.cos(angle);
+                                const y = centerY + radius * Math.sin(angle);
+                                return (
+                                    <g key={`anode-${i}`} transform={`translate(${x}, ${y})`}>
+                                        <circle r="28" fill="var(--bg-card)" stroke="#ef4444" strokeWidth="2" />
+                                        <foreignObject x="-28" y="-28" width="56" height="56">
+                                            <div className="flex items-center justify-center w-full h-full text-[10px] text-center leading-tight font-medium text-textmain p-1 break-words">{ant}</div>
+                                        </foreignObject>
+                                    </g>
+                                );
+                            })}
+                            
+                            {/* Center Node */}
+                            <g transform={`translate(${centerX}, ${centerY})`}>
+                                <circle r="45" fill="var(--accent-color)" className="shadow-lg" />
+                                <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="13" fontWeight="bold" className="capitalize">{centerWord}</text>
+                            </g>
+                        </svg>
+                    </div>
+                    <div className="flex gap-4 text-xs mt-2">
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Synonyms</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Antonyms</span>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SAVED WORDS COMPONENT ---
+        const SavedWords = ({ saved, onSelect, onDelete }) => (
+            <div className="bg-cardbg rounded-xl border border-bordercol p-4 mb-6">
+                <h3 className="text-sm font-bold text-textsec uppercase tracking-wider mb-3">Saved Words</h3>
+                {saved.length === 0 ? <p className="text-xs text-textsec italic">No saved words yet.</p> : (
+                    <div className="flex flex-wrap gap-2">
+                        {saved.map((w, i) => (
+                            <div key={i} className="flex items-center bg-darkbg border border-bordercol rounded-full pl-3 pr-1 py-1 group">
+                                <span onClick={() => onSelect(w)} className="text-sm cursor-pointer hover:text-accent mr-2">{w}</span>
+                                <button onClick={() => onDelete(w)} className="p-1 rounded-full hover:bg-red-500/20 text-textsec hover:text-red-500 transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+
+        // --- WORD OF THE DAY COMPONENT ---
+        const DailyWordButton = ({ onSelect }) => {
+            const getDaily = async () => {
+                try {
+                    const r = await fetch('/api/daily-word');
+                    const d = await r.json();
+                    if(d.word) onSelect(d.word);
+                } catch(e) { console.error(e); }
+            };
+
+            return (
+                <button 
+                    onClick={getDaily} 
+                    className="fixed bottom-6 left-6 z-40 bg-cardbg border border-bordercol p-3 rounded-full shadow-lg hover:shadow-xl hover:border-accent group transition-all"
+                    title="Word of the Day"
+                >
+                    <span className="flex items-center gap-2 font-bold text-accent">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap">Word of Day</span>
+                    </span>
+                </button>
+            );
+        };
+
+        function App() {
+            const [q, setQ] = useState(''), [lang, setLang] = useState('hi'), [res, setRes] = useState(null), [load, setLoad] = useState(false), [err, setErr] = useState(''), [mic, setMic] = useState(false);
+            const [theme, setTheme] = useState('dark');
+            const [savedWords, setSavedWords] = useState([]);
+            const [history, setHistory] = useState([]);
+            const [copied, setCopied] = useState(false);
+
+            // Theme Management
+            useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+            const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+            // Load Saved Words & History
+            const fetchSaved = async () => {
+                const r = await fetch('/api/saved');
+                const d = await r.json();
+                setSavedWords(d);
+            };
+            useEffect(() => { 
+                fetchSaved();
+                const storedHist = localStorage.getItem('dict_search_history');
+                if (storedHist) setHistory(JSON.parse(storedHist));
+            }, []);
+
+            // History Functions
+            const addToHistory = (word) => {
+                const newHist = [word, ...history.filter(w => w.toLowerCase() !== word.toLowerCase())].slice(0, 10);
+                setHistory(newHist);
+                localStorage.setItem('dict_search_history', JSON.stringify(newHist));
+            };
+
+            const clearHistory = () => {
+                setHistory([]);
+                localStorage.removeItem('dict_search_history');
+            };
+            
+            const saveCurrentWord = async () => {
+                if(!res?.word) return;
+                await fetch('/api/saved', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({word: res.word}) });
+                fetchSaved();
+            };
+            
+            const deleteWord = async (w) => {
+                await fetch(`/api/saved/${w}`, { method: 'DELETE' });
+                fetchSaved();
+            };
+
+            const copyToClipboard = () => {
+                if(res?.word) {
+                    navigator.clipboard.writeText(res.word);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                }
+            };
+
+            const search = async (e, wordOverride = null) => {
+                if(e) e.preventDefault(); 
+                const term = wordOverride || q; 
+                if(!term.trim()) return;
+                
+                if(wordOverride) setQ(wordOverride); 
+                setLoad(true); setErr(''); setRes(null);
+                
+                try {
+                    const r = await fetch(`/api/search/${term}?target_lang=${lang}`);
+                    const d = await r.json();
+                    
+                    if (d.error && d.error !== "Word not found in dictionary.") { 
+                        setErr(d.error); 
+                    } else { 
+                        setRes(d); 
+                        if(d.error) setErr(d.error);
+                        
+                        // Add to history if found
+                        if (!d.error || d.error === "Word not found in dictionary.") {
+                            addToHistory(d.word);
+                        }
+                    }
+                } catch(e) { setErr('Server error.'); } finally { setLoad(false); }
+            };
+
+            const startMic = () => { const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if(!SR) return alert("Browser not supported"); const r = new SR(); r.lang='en-US'; r.maxAlternatives=1; r.onstart=()=>setMic(true); r.onend=()=>setMic(false); r.onresult=(e)=>{ setQ(e.results[0][0].transcript); }; r.start(); };
+            const playMain = (audio) => audio && new Audio(`data:audio/mp3;base64,${audio}`).play();
+
+            return (
+                <div className="container mx-auto p-4 max-w-6xl relative pb-20">
+                    <button onClick={toggleTheme} className="absolute top-4 right-4 p-3 rounded-full bg-cardbg border border-bordercol text-accent hover:shadow-lg transition-all z-40">
+                        {theme === 'dark' ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>}
+                    </button>
+
+                    <header className="text-center mb-6 mt-6">
+                        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-accent to-blue-400 mb-2">Dictionary</h1>
+                    </header>
+
+                    <form onSubmit={search} className="flex flex-col md:flex-row gap-3 mb-6 justify-center items-center">
+                        <div className="relative w-full max-w-md"><input type="text" className="bg-cardbg border-2 border-bordercol text-textmain rounded-xl p-4 w-full pr-12 focus:border-accent outline-none shadow-sm transition-colors" placeholder="Search..." value={q} onChange={(e)=>setQ(e.target.value)} /><button type="button" onClick={startMic} className={`absolute right-3 top-1/2 -translate-y-1/2 text-accent p-2 ${mic?'mic-active':''}`}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button></div>
+                        <select value={lang} onChange={(e)=>setLang(e.target.value)} className="bg-cardbg border-2 border-bordercol text-textmain rounded-xl p-4 w-full md:w-auto outline-none cursor-pointer shadow-sm">{languages.map(l=><option key={l.code} value={l.code} className="bg-cardbg">{l.name}</option>)}</select>
+                        <button type="submit" className="bg-accent hover:bg-accent_hover text-white px-8 py-4 rounded-xl font-bold w-full md:w-auto shadow-lg" disabled={load}>{load?'...':'Search'}</button>
+                    </form>
+
+                    {/* SEARCH HISTORY SECTION */}
+                    {history.length > 0 && (
+                        <div className="max-w-3xl mx-auto mb-8">
+                            <div className="flex justify-between items-end mb-2 px-2">
+                                <span className="text-xs font-bold text-textsec uppercase tracking-wider">Recent Searches</span>
+                                <button onClick={clearHistory} className="text-xs text-red-500 hover:text-red-400 hover:underline transition">Clear History</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                {history.map((word, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={(e) => search(e, word)} 
+                                        className="bg-cardbg border border-bordercol px-4 py-1.5 rounded-full text-sm text-textsec hover:text-accent hover:border-accent transition shadow-sm"
+                                    >
+                                        {word}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <SavedWords saved={savedWords} onSelect={(w) => search(null, w)} onDelete={deleteWord} />
+
+                    {err && <div className="bg-red-500/10 border-l-4 border-red-500 text-red-500 p-4 mb-8">{err}</div>}
+
+                    {res && (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+                            <div className="lg:col-span-7 space-y-6">
+                                <div className="bg-cardbg p-8 rounded-2xl shadow-xl border border-bordercol relative overflow-hidden">
+                                    <div className="flex justify-between border-b border-bordercol pb-6 mb-6 items-center">
+                                        <div className="flex items-start gap-4">
+                                            <div><h2 className="text-5xl font-bold text-textmain capitalize">{res.word}</h2>{res.phonetics[0] && <span className="text-accent text-xl font-mono mt-2 block">{res.phonetics[0].text}</span>}</div>
+                                            <button onClick={saveCurrentWord} className="mt-2 p-2 rounded-full hover:bg-accent/10 text-textsec hover:text-accent transition" title="Save Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg></button>
+                                            <button onClick={copyToClipboard} className="mt-2 p-2 rounded-full hover:bg-accent/10 text-textsec hover:text-accent transition" title="Copy Word">
+                                                {copied ? (
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                ) : (
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                        {res.phonetics.find(p=>p.audio) && <button onClick={()=>new Audio(res.phonetics.find(p=>p.audio).audio).play()} className="bg-accent/10 text-accent p-4 rounded-full hover:bg-accent hover:text-white transition border border-bordercol"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>}
+                                    </div>
+                                    <div className="space-y-6">
+                                        {res.definitions.map((d,i)=>(
+                                            <div key={i} className="bg-darkbg/50 p-6 rounded-xl border border-bordercol hover:border-accent/50 transition">
+                                                <div className="mb-3 flex flex-wrap items-center gap-3">
+                                                    <span className="italic font-bold text-accent text-lg">{d.partOfSpeech}</span>
+                                                    {d.translatedPartOfSpeech && d.translatedPartOfSpeech!==d.partOfSpeech && <div className="flex items-center bg-accent/10 border border-accent/20 rounded-full px-3 py-1"><span className="text-xs font-semibold text-accent">{d.translatedPartOfSpeech}</span><InlineSpeaker text={d.translatedPartOfSpeech} lang={lang}/></div>}
+                                                </div>
+                                                <div className="mb-3 flex items-start gap-2"><p className="text-textmain text-lg">{d.definition}</p><InlineSpeaker text={d.definition} lang="en"/></div>
+                                                {d.example && <div className="mt-3 text-sm border-l-4 border-accent pl-4 py-1 bg-accent/5"><div className="flex gap-2"><p className="text-textsec italic">"{d.example}"</p><InlineSpeaker text={d.example} lang="en"/></div>{d.translatedExample && <div className="flex gap-2 mt-1"><p className="text-accent italic">"{d.translatedExample}"</p><InlineSpeaker text={d.translatedExample} lang={lang}/></div>}</div>}
+                                                <div className="mt-5 flex flex-col gap-3">
+                                                    {d.translatedSynonyms?.length>0 && <div className="text-sm"><span className="font-bold text-green-500 text-xs block mb-2">SYNONYMS</span><div className="flex flex-wrap gap-2">{d.translatedSynonyms.map((s,j)=><div key={j} className="synonym-tag"><span className="mr-1">{s}</span><InlineSpeaker text={s} lang={lang}/></div>)}</div></div>}
+                                                    {d.translatedAntonyms?.length>0 && <div className="text-sm"><span className="font-bold text-red-500 text-xs block mb-2">ANTONYMS</span><div className="flex flex-wrap gap-2">{d.translatedAntonyms.map((a,j)=><div key={j} className="antonym-tag"><span className="mr-1">{a}</span><InlineSpeaker text={a} lang={lang}/></div>)}</div></div>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="bg-cardbg p-6 rounded-2xl shadow-xl border border-bordercol">
+                                     <h3 className="text-xl font-bold mb-6 text-textmain flex items-center gap-2 border-b border-bordercol pb-2">Visual Context</h3>
+                                    <div className="grid grid-cols-2 gap-4">{res.images.length>0?res.images.map((img,i)=>(<div key={i} className="overflow-hidden rounded-xl border border-bordercol"><img src={img} className="w-full h-40 object-cover hover:scale-110 transition duration-500"/></div>)):<p className="text-textsec italic col-span-2">No images.</p>}</div>
+                                </div>
+                                {/* NEW: Vocabulary Section (Synonyms & Antonyms) */}
+                                {(res.concept_map?.synonyms?.length > 0 || res.concept_map?.antonyms?.length > 0) && (
+                                    <div className="bg-cardbg p-6 rounded-2xl shadow-xl border border-bordercol mt-6">
+                                        <h3 className="text-xl font-bold mb-4 text-textmain flex items-center gap-2 border-b border-bordercol pb-2">
+                                            Vocabulary
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {res.concept_map?.synonyms?.length > 0 && (
+                                                <div>
+                                                    <span className="text-xs font-bold text-green-600 uppercase tracking-wider block mb-2">Synonyms</span>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {res.concept_map.synonyms.map((s, i) => (
+                                                            <div key={i} className="synonym-tag">
+                                                                <span className="mr-1">{s}</span>
+                                                                <InlineSpeaker text={s} lang={lang} />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {res.concept_map?.antonyms?.length > 0 && (
+                                                <div>
+                                                    <span className="text-xs font-bold text-red-600 uppercase tracking-wider block mb-2">Antonyms</span>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {res.concept_map.antonyms.map((a, i) => (
+                                                            <div key={i} className="antonym-tag">
+                                                                <span className="mr-1">{a}</span>
+                                                                <InlineSpeaker text={a} lang={lang} />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="lg:col-span-5">
+                                <div className="lg:sticky lg:top-6 space-y-6 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto pr-1">
+                                    {res.translation.text ? (
+                                        <div className="bg-cardbg p-8 rounded-2xl shadow-2xl border border-bordercol">
+                                            <h3 className="text-2xl font-bold text-textmain mb-8 border-b border-bordercol pb-4">Translation</h3>
+                                            <div className="text-center py-10 bg-darkbg/30 rounded-2xl border border-bordercol flex flex-col items-center">
+                                                <span className="text-xs font-bold text-accent uppercase tracking-widest mb-4 bg-accent/10 px-3 py-1 rounded-full border border-accent/20">{res.translation.lang}</span>
+                                                <p className="text-5xl font-black text-textmain mb-8 leading-tight">{res.translation.text}</p>
+                                                <button onClick={()=>playMain(res.translation.audio)} disabled={!res.translation.audio} className="pronounce-btn flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-full font-bold shadow-lg disabled:opacity-50 hover:shadow-xl transform hover:-translate-y-1 transition">Listen Now</button>
+                                            </div>
+                                        </div>
+                                    ) : <div className="bg-cardbg p-6 rounded-2xl text-textsec italic">No translation.</div>}
+                                    
+                                    <ConceptMap centerWord={res.word} conceptMap={res.concept_map} lang={lang} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <DailyWordButton onSelect={(w) => search(null, w)} />
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>
